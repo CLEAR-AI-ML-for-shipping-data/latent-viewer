@@ -7,8 +7,16 @@ from . import viewer
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--embeddings", help="Embeddings file", required=True)
+    parser = argparse.ArgumentParser(
+        prog="lv",
+        description="LatentViewer, a 3D interactive image embedding inspector",
+    )
+    parser.add_argument(
+        "-e",
+        "--embeddings",
+        help="Embeddings file, a CSV file that contains the embbeddings",
+        required=True,
+    )
     parser.add_argument(
         "-a", "--image-archive", help="Trajectory image archive (hdf5)", required=True
     )
