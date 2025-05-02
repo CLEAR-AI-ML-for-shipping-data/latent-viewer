@@ -14,7 +14,7 @@ def main():
     )
     parser.add_argument(
         "-f",
-        "--file-column",
+        "--filecolumn",
         help="Filename column in the embeddings file",
         default="filename",
     )
@@ -25,7 +25,7 @@ def main():
     args = parser.parse_args()
     viewer.embeddings_file = args.embeddings
     viewer.arrays_file = args.image_archive
-    viewer.filecolumn = args.file_column
+    viewer.filecolumn = args.filecolumn
     debug = args.debug
 
     if debug is False:
