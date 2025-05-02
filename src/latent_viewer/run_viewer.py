@@ -1,4 +1,5 @@
 import argparse
+import logging
 import sys
 
 from loguru import logger
@@ -44,9 +45,12 @@ def main():
     viewer.emb_dim_prefix = args.embedding_column_prefix
     debug = args.debug
 
-    if debug is False:
-        logger.remove()
-        logger.add(sys.stderr, level="INFO")
+    log_level = "INFO"
+    if debug is True:
+        log_level = "DEBUG"
+    logger.remove()
+    logger.add(sys.stderr, level=log_level)
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
     viewer.app.run(debug=debug)
 
 
