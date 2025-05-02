@@ -21,17 +21,26 @@ def main():
     parser.add_argument(
         "-d", "--debug", help="Run in debug mode", type=bool, default=False
     )
+    parser.add_argument(
+        "-p",
+        "--embedding-column-prefix",
+        help="Prefix for embedding column names",
+        type=str,
+        default="emb_dim",
+    )
 
     args = parser.parse_args()
     viewer.embeddings_file = args.embeddings
     viewer.arrays_file = args.image_archive
     viewer.filecolumn = args.filecolumn
+    viewer.emb_dim_prefix = args.embedding_column_prefix
     debug = args.debug
 
     if debug is False:
         logger.remove()
         logger.add(sys.stderr, level="INFO")
     viewer.app.run(debug=debug)
+
 
 if __name__ == "__main__":
     main()

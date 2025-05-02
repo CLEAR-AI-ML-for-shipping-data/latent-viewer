@@ -22,8 +22,8 @@ from sklearn.svm import SVC
 
 embeddings_file = None
 arrays_file = None
-#
 filecolumn = None
+emb_dim_prefix = None
 ENCODING = "utf-16-le"
 
 
@@ -331,7 +331,9 @@ def update_raw_pca_data(n_clicks):
     edf = pd.read_csv(embeddings_file, sep=";", index_col=0)
     df = edf.copy()
 
-    embeddings_columns = [col for col in df.columns if "emb_dim" in col]
+    embeddings_columns = [col for col in df.columns if col.startswith(emb_dim_prefix)]
+    if len(embeddings_columns) == 0:
+        logger.error(f"No embedding columns found with prefix {emb_dim_prefix}")
 
     pca_decomposer = PCA()
     pca_vectors = pca_decomposer.fit_transform(df.loc[:, embeddings_columns].values)
@@ -339,8 +341,6 @@ def update_raw_pca_data(n_clicks):
     xvalues = df.loc[:, embeddings_columns]
     xvalues = pca_vectors[:, :3]
 
-    filecolumn = "filename"
-    # plot_df = df[[filecolumn]].copy()
     plot_df = df[[filecolumn, "class"]].copy()
 
     plot_df[filecolumn] = plot_df[filecolumn].apply(lambda x: f"file_{x}")
@@ -368,7 +368,9 @@ def update_raw_pca_data(n_clicks):
 def set_initial_xy_values(dataf):
     df = pd.read_json(StringIO(dataf))
 
-    embeddings_columns = [col for col in df.columns if "emb_dim" in col]
+    embeddings_columns = [col for col in df.columns if col.startswith(emb_dim_prefix)]
+    if len(embeddings_columns) == 0:
+        logger.error(f"No embedding columns found with prefix {emb_dim_prefix}")
 
     x_values = df.loc[
         :,
