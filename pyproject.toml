@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-latent-viewer = "latent_viewer:main"
+lv = "latent_viewer:main"
 
 [build-system]
 requires = ["hatchling"]

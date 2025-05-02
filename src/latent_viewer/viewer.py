@@ -20,17 +20,10 @@ from skactiveml.utils import MISSING_LABEL, labeled_indices, unlabeled_indices
 from sklearn.decomposition import PCA
 from sklearn.svm import SVC
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-e", "--embeddings", help="Embeddings file", required=True)
-parser.add_argument(
-    "-a", "--image-archive", help="Trajectory image archive (hdf5)", required=True
-)
-
-args = parser.parse_args()
-embeddings_file = args.embeddings
-arrays_file = args.image_archive
-
-filecolumn = "filename"
+embeddings_file = None
+arrays_file = None
+#
+filecolumn = None
 ENCODING = "utf-16-le"
 
 
@@ -540,20 +533,3 @@ def download_excel(n_clicks_excel, n_clicks_csv, x_values, y_labeled, y_predicte
         return dcc.send_data_frame(out_df.to_excel, "predictions.xlsx")
     else:
         return dcc.send_data_frame(out_df.to_csv, "predictions.csv")
-
-
-if __name__ == "__main__":
-    debug = True
-    if debug is not True:
-        logger.remove()
-        logger.add(sys.stderr, level="INFO")
-    app.run(debug=debug)
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument("-e", "--embeddings", help="Embeddings file", required=True)
-#     parser.add_argument(
-#         "-a", "--image-archive", help="Trajectory image archive (hdf5)", required=True
-#     )
-#
-#     args = parser.parse_args()
-#
-#     main(args.embeddings, args.image_archive)
