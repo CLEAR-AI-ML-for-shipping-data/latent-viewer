@@ -405,7 +405,7 @@ def display_label_container(click_data, labels):
     if click_data is None:
         return -1, {"visibility": "hidden"}
 
-    trajectory_id = f"file_{click_data["points"][0]["customdata"][0]}"
+    trajectory_id = f"file_{click_data['points'][0]['customdata'][0]}"
     logger.debug({f"Selected trajectory {trajectory_id}"})
 
     labels = pd.read_json(StringIO(labels))
@@ -427,7 +427,7 @@ def update_label(all_labels, click_data, label):
     if click_data is None:
         return no_update
 
-    trajectory_id = f"file_{click_data["points"][0]["customdata"][0]}"
+    trajectory_id = f"file_{click_data['points'][0]['customdata'][0]}"
     labels = pd.read_json(StringIO(all_labels))
     labels.loc[labels[filecolumn] == trajectory_id, "label"] = label
 
