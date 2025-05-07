@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from latent-viewer!")
+from .run_viewer import main

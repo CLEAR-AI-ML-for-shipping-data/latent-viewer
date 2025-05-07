@@ -20,17 +20,10 @@ from skactiveml.utils import MISSING_LABEL, labeled_indices, unlabeled_indices
 from sklearn.decomposition import PCA
 from sklearn.svm import SVC
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-e", "--embeddings", help="Embeddings file", required=True)
-parser.add_argument(
-    "-a", "--image-archive", help="Trajectory image archive (hdf5)", required=True
-)
-
-args = parser.parse_args()
-embeddings_file = args.embeddings
-arrays_file = args.image_archive
-
-filecolumn = "filename"
+embeddings_file = None
+arrays_file = None
+filecolumn = None
+emb_dim_prefix = None
 ENCODING = "utf-16-le"
 
 
@@ -81,7 +74,7 @@ def show_hdf5_image(filename):
 
 external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
-app = Dash(__name__, external_stylesheets=external_stylesheets)
+app = Dash(__name__, external_stylesheets=external_stylesheets, title="LatentViewer")
 
 app.layout = html.Div(
     [
@@ -338,7 +331,9 @@ def update_raw_pca_data(n_clicks):
     edf = pd.read_csv(embeddings_file, sep=";", index_col=0)
     df = edf.copy()
 
-    embeddings_columns = [col for col in df.columns if "emb_dim" in col]
+    embeddings_columns = [col for col in df.columns if col.startswith(emb_dim_prefix)]
+    if len(embeddings_columns) == 0:
+        logger.error(f"No embedding columns found with prefix {emb_dim_prefix}")
 
     pca_decomposer = PCA()
     pca_vectors = pca_decomposer.fit_transform(df.loc[:, embeddings_columns].values)
@@ -346,8 +341,6 @@ def update_raw_pca_data(n_clicks):
     xvalues = df.loc[:, embeddings_columns]
     xvalues = pca_vectors[:, :3]
 
-    filecolumn = "filename"
-    # plot_df = df[[filecolumn]].copy()
     plot_df = df[[filecolumn, "class"]].copy()
 
     plot_df[filecolumn] = plot_df[filecolumn].apply(lambda x: f"file_{x}")
@@ -375,7 +368,9 @@ def update_raw_pca_data(n_clicks):
 def set_initial_xy_values(dataf):
     df = pd.read_json(StringIO(dataf))
 
-    embeddings_columns = [col for col in df.columns if "emb_dim" in col]
+    embeddings_columns = [col for col in df.columns if col.startswith(emb_dim_prefix)]
+    if len(embeddings_columns) == 0:
+        logger.error(f"No embedding columns found with prefix {emb_dim_prefix}")
 
     x_values = df.loc[
         :,
@@ -540,20 +535,3 @@ def download_excel(n_clicks_excel, n_clicks_csv, x_values, y_labeled, y_predicte
         return dcc.send_data_frame(out_df.to_excel, "predictions.xlsx")
     else:
         return dcc.send_data_frame(out_df.to_csv, "predictions.csv")
-
-
-if __name__ == "__main__":
-    debug = True
-    if debug is not True:
-        logger.remove()
-        logger.add(sys.stderr, level="INFO")
-    app.run(debug=debug)
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument("-e", "--embeddings", help="Embeddings file", required=True)
-#     parser.add_argument(
-#         "-a", "--image-archive", help="Trajectory image archive (hdf5)", required=True
-#     )
-#
-#     args = parser.parse_args()
-#
-#     main(args.embeddings, args.image_archive)
