@@ -2,6 +2,7 @@ import argparse
 import json
 import pickle
 import sys
+from datetime import datetime
 from io import StringIO
 from time import time
 from typing import Dict
@@ -184,6 +185,7 @@ app.layout = html.Div(
                 ),
                 html.Button("Download Excel", id="btn-download-excel"),
                 html.Button("Download CSV", id="btn-download-csv"),
+                html.Button("Download Model", id="btn-download-model"),
                 dcc.Download(id="download-data"),
             ],
             style={"display": "inline-block", "vertical-align": "top", "width": "40%"},
@@ -200,6 +202,7 @@ app.layout = html.Div(
                 dcc.Store(id="selected-data-point"),
                 dcc.Store(id="queried-data-point"),
                 dcc.Store(id="svc-model"),
+                dcc.Download(id="download-model"),
             ]
         ),
     ]
@@ -535,3 +538,19 @@ def download_excel(n_clicks_excel, n_clicks_csv, x_values, y_labeled, y_predicte
         return dcc.send_data_frame(out_df.to_excel, "predictions.xlsx")
     else:
         return dcc.send_data_frame(out_df.to_csv, "predictions.csv")
+
+
+@callback(
+    Output("download-model", "data"),
+    Input("btn-download-model", "n_clicks"),
+    Input("svc-model", "data"),
+    prevent_initial_call=True,
+)
+def download_model(n_clicks_button, svc_model):
+    if callback_context.triggered_id != "btn-download-model":
+        return no_update
+
+    dt_stamp = datetime.now().strftime("%Y%m%d_%H%M")
+    clf_b64_string = bytes.fromhex(svc_model)
+
+    return dcc.send_bytes(clf_b64_string, filename=f"model_{dt_stamp}.pkl")
