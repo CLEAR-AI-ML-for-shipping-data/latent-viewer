@@ -74,7 +74,7 @@ def show_hdf5_image(filename):
 
 external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
-app = Dash(__name__, external_stylesheets=external_stylesheets)
+app = Dash(__name__, external_stylesheets=external_stylesheets, title="LatentViewer")
 
 app.layout = html.Div(
     [
