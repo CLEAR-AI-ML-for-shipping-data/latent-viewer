@@ -37,12 +37,16 @@ def main():
         type=str,
         default="emb_dim",
     )
+    parser.add_argument(
+        "-c", "--class-column", help="Name of class column", type=str, default="class"
+    )
 
     args = parser.parse_args()
     viewer.embeddings_file = args.embeddings
     viewer.arrays_file = args.image_archive
     viewer.filecolumn = args.filecolumn
     viewer.emb_dim_prefix = args.embedding_column_prefix
+    viewer.classcolumn = args.class_column
     debug = args.debug
 
     log_level = "INFO"
