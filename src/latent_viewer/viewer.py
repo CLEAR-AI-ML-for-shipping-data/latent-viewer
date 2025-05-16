@@ -338,6 +338,11 @@ def update_raw_pca_data(n_clicks):
     embeddings_columns = [col for col in df.columns if col.startswith(emb_dim_prefix)]
     if len(embeddings_columns) == 0:
         logger.error(f"No embedding columns found with prefix {emb_dim_prefix}")
+    logger.info(f"{df.columns}")
+    logger.info(f"{classcolumn}")
+    if classcolumn not in df.columns:
+        logger.warning(f"Label column '{classcolumn}' not found, adding it instead")
+        df[classcolumn] = ''
 
     pca_decomposer = PCA()
     pca_vectors = pca_decomposer.fit_transform(df.loc[:, embeddings_columns].values)
