@@ -19,6 +19,13 @@ dependencies = [
     "scikit-learn>=1.3.2",
 ]
 
+license = "GPL-2.0-or-later"
+license-files = ["LICENSE"]
+
+[project.urls]
+Homepage = "https://github.com/CLEAR-AI-ML-for-shipping-data/latent-viewer"
+Issues = "https://github.com/CLEAR-AI-ML-for-shipping-data/latent-viewer/issues"
+
 [project.scripts]
 lv = "latent_viewer:main"
 
