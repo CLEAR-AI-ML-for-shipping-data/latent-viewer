@@ -9,3 +9,19 @@ closest neighbours.
 Additionally, there is the possibility to train an SVM classifier through an
 active learning method.
 This is particularly useful when dealing with embeddings of an unlabeled data set.
+
+## Installation
+
+Install the latent viewer with pip:
+```bash
+pip install latent-viewer
+```
+
+## Usage
+
+After installation, the `latent-viewer` can be invoked with `lv`.
+For using, it is important to specify both a file with the embeddings, as well as an HDF5 image archive.
+
+```bash
+lv -e embeddings.csv -a image_archive.hdf5
+```
