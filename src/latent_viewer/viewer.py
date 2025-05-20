@@ -24,6 +24,7 @@ from sklearn.svm import SVC
 embeddings_file = None
 arrays_file = None
 filecolumn = None
+classcolumn = None
 emb_dim_prefix = None
 ENCODING = "utf-16-le"
 
@@ -258,12 +259,11 @@ def plot_trajectory_points(plot_json, predicted_labels):
 
     if predicted_labels is not None:
         plabels = pd.read_json(StringIO(predicted_labels))
-        plot_df = plot_df.drop(columns="class")
+        plot_df = plot_df.drop(columns=classcolumn)
 
         plot_df = pd.merge(plot_df, plabels, on=filecolumn)
 
     plot_df[filecolumn] = plot_df[filecolumn].apply(lambda x: x[5:])
-    color_column = "class"
 
     fig = px.scatter_3d(
         data_frame=plot_df,
@@ -273,7 +273,7 @@ def plot_trajectory_points(plot_json, predicted_labels):
         custom_data=filecolumn,
         size="ms",
         opacity=0.5,
-        color=color_column,
+        color=classcolumn,
     )
     fig.update_layout(margin={"l": 0, "b": 0, "t": 0, "r": 0}, hovermode="closest")
     return fig
@@ -337,6 +337,11 @@ def update_raw_pca_data(n_clicks):
     embeddings_columns = [col for col in df.columns if col.startswith(emb_dim_prefix)]
     if len(embeddings_columns) == 0:
         logger.error(f"No embedding columns found with prefix {emb_dim_prefix}")
+    logger.info(f"{df.columns}")
+    logger.info(f"{classcolumn}")
+    if classcolumn not in df.columns:
+        logger.warning(f"Label column '{classcolumn}' not found, adding it instead")
+        df[classcolumn] = 'regular'
 
     pca_decomposer = PCA()
     pca_vectors = pca_decomposer.fit_transform(df.loc[:, embeddings_columns].values)
@@ -344,17 +349,13 @@ def update_raw_pca_data(n_clicks):
     xvalues = df.loc[:, embeddings_columns]
     xvalues = pca_vectors[:, :3]
 
-    plot_df = df[[filecolumn, "class"]].copy()
+    plot_df = df[[filecolumn, classcolumn]].copy()
 
     plot_df[filecolumn] = plot_df[filecolumn].apply(lambda x: f"file_{x}")
     plot_df["xcol"] = xvalues[:, 0]
     plot_df["ycol"] = xvalues[:, 1]
     plot_df["zcol"] = xvalues[:, 2]
     plot_df["ms"] = 10
-
-    plot_df["class"] = plot_df["class"].apply(
-        lambda x: {"regular": "normal", "outlier": "outlier"}[x]
-    )
 
     df[filecolumn] = df[filecolumn].apply(lambda x: f"file_{x}")
 
@@ -387,7 +388,7 @@ def set_initial_xy_values(dataf):
     y_labeled["label"] = -1
 
     y_prediction = df.loc[:, [filecolumn]].copy()
-    y_prediction["class"] = "Regular"
+    y_prediction[classcolumn] = "Regular"
 
     return x_values.to_json(), y_labeled.to_json(), y_prediction.to_json()
 
@@ -493,8 +494,8 @@ def query_model(button_click, x_values, y_labels, pca_data, model, svm_C, svm_ga
 
     clickdata = {"points": [pca_dict]}
 
-    files["class"] = clf.predict(x_values)
-    files["class"] = files["class"].apply(lambda x: ["Regular", "Outlier"][x])
+    files[classcolumn] = clf.predict(x_values)
+    files[classcolumn] = files[classcolumn].apply(lambda x: ["Regular", "Outlier"][x])
     out_clf = pickle.dumps(clf).hex()
     return clickdata, out_clf, files.to_json()
 
