@@ -264,7 +264,6 @@ def plot_trajectory_points(plot_json, predicted_labels):
         plot_df = pd.merge(plot_df, plabels, on=filecolumn)
 
     plot_df[filecolumn] = plot_df[filecolumn].apply(lambda x: x[5:])
-    color_column = classcolumn
 
     fig = px.scatter_3d(
         data_frame=plot_df,
@@ -274,7 +273,7 @@ def plot_trajectory_points(plot_json, predicted_labels):
         custom_data=filecolumn,
         size="ms",
         opacity=0.5,
-        color=color_column,
+        color=classcolumn,
     )
     fig.update_layout(margin={"l": 0, "b": 0, "t": 0, "r": 0}, hovermode="closest")
     return fig
@@ -357,10 +356,6 @@ def update_raw_pca_data(n_clicks):
     plot_df["ycol"] = xvalues[:, 1]
     plot_df["zcol"] = xvalues[:, 2]
     plot_df["ms"] = 10
-
-    plot_df[classcolumn] = plot_df[classcolumn].apply(
-        lambda x: {"regular": "normal", "outlier": "outlier"}[x]
-    )
 
     df[filecolumn] = df[filecolumn].apply(lambda x: f"file_{x}")
 
