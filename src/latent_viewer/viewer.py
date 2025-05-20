@@ -342,7 +342,7 @@ def update_raw_pca_data(n_clicks):
     logger.info(f"{classcolumn}")
     if classcolumn not in df.columns:
         logger.warning(f"Label column '{classcolumn}' not found, adding it instead")
-        df[classcolumn] = ''
+        df[classcolumn] = 'regular'
 
     pca_decomposer = PCA()
     pca_vectors = pca_decomposer.fit_transform(df.loc[:, embeddings_columns].values)
