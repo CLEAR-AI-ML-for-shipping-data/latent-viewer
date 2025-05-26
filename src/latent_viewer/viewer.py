@@ -203,6 +203,7 @@ app.layout = html.Div(
                 dcc.Store(id="selected-data-point"),
                 dcc.Store(id="queried-data-point"),
                 dcc.Store(id="svc-model"),
+                dcc.Store(id="metadata-column-names"),
                 dcc.Download(id="download-model"),
             ]
         ),
@@ -235,17 +236,44 @@ def update_stored_data(stored_data, n_clicks, clicked_data):
     Input("trajectories-scatter", "hoverData"),
     # Input("trajectories-scatter", "clickData"),
     Input("selected-data-point", "data"),
+    Input("metadata-column-names", "data"),
     prevent_initial_call=True,
 )
-def render_trajectory_image(hoverData: Dict, clickData):
+def render_trajectory_image(hoverData: Dict, clickData, metadata_columns):
     if clickData is not None:
         filename = clickData["points"][0]["customdata"][0]
+        metadata_dict = clickData["points"][0]["customdata"]
     elif hoverData is not None:
         filename = hoverData["points"][0]["customdata"][0]
+        metadata_dict = hoverData["points"][0]["customdata"]
     else:
         return _no_trajectory_selected_message()
+
+    metadata_columns = json.loads(metadata_columns)
     fig = show_hdf5_image(filename)
-    fig.update_layout(title=filename.split("/")[-1], margin={"l": 0, "b": 0, "r": 0})
+    fig.update_layout(title=filename.split("/")[-1], margin={"l": 0, "b": 0, "r": 150})
+
+    annotation_string = ""
+    for idx, m_col_name in enumerate(metadata_columns):
+        value = metadata_dict[idx + 1]
+        annotation_string += f"{m_col_name}: {value}<br>"
+
+    # fig.update_layout(margin=dict(l=150))
+
+    fig.add_annotation(
+        dict(
+            text=annotation_string,
+            x=.85,
+            y=1,
+            showarrow=False,
+            textangle=0,
+            xref="paper",
+            yref="paper",
+            align="left",
+            xanchor="left",
+        )
+    )
+
     return fig
 
 
@@ -253,9 +281,11 @@ def render_trajectory_image(hoverData: Dict, clickData):
     Output("trajectories-scatter", "figure"),
     Input("raw-pca-data", "data"),
     Input("y-predicted", "data"),
+    Input("metadata-column-names", "data"),
 )
-def plot_trajectory_points(plot_json, predicted_labels):
+def plot_trajectory_points(plot_json, predicted_labels, metadata_columns):
     plot_df = pd.read_json(StringIO(plot_json))
+    metadata_columns = json.loads(metadata_columns)
 
     if predicted_labels is not None:
         plabels = pd.read_json(StringIO(predicted_labels))
@@ -270,7 +300,7 @@ def plot_trajectory_points(plot_json, predicted_labels):
         x="xcol",
         y="ycol",
         z="zcol",
-        custom_data=filecolumn,
+        custom_data=[filecolumn] + metadata_columns,
         size="ms",
         opacity=0.5,
         color=classcolumn,
@@ -328,6 +358,7 @@ def update_related_images(clickData, plot_json):
 @callback(
     Output("raw-pca-data", "data"),
     Output("fitted-data", "data"),
+    Output("metadata-column-names", "data"),
     Input("like-button", "n_clicks"),
 )
 def update_raw_pca_data(n_clicks):
@@ -343,13 +374,16 @@ def update_raw_pca_data(n_clicks):
         logger.warning(f"Label column '{classcolumn}' not found, adding it instead")
         df[classcolumn] = 'regular'
 
+    known_columns = embeddings_columns + [filecolumn, classcolumn]
+    metadata_columns = [col for col in df.columns if col not in known_columns]
+
     pca_decomposer = PCA()
     pca_vectors = pca_decomposer.fit_transform(df.loc[:, embeddings_columns].values)
 
     xvalues = df.loc[:, embeddings_columns]
     xvalues = pca_vectors[:, :3]
 
-    plot_df = df[[filecolumn, classcolumn]].copy()
+    plot_df = df[[filecolumn, classcolumn] + metadata_columns].copy()
 
     plot_df[filecolumn] = plot_df[filecolumn].apply(lambda x: f"file_{x}")
     plot_df["xcol"] = xvalues[:, 0]
@@ -359,7 +393,7 @@ def update_raw_pca_data(n_clicks):
 
     df[filecolumn] = df[filecolumn].apply(lambda x: f"file_{x}")
 
-    return plot_df.to_json(), df.to_json()
+    return plot_df.to_json(), df.to_json(), json.dumps(metadata_columns)
 
 
 @callback(
