@@ -484,9 +484,10 @@ def print_labels(labels):
     Input("svc-model", "data"),
     Input("svm-C-param", "value"),
     Input("svm-gamma-param", "value"),
+    Input("metadata-column-names", "data"),
     prevent_initial_call="initial_duplicate",
 )
-def query_model(button_click, x_values, y_labels, pca_data, model, svm_C, svm_gamma):
+def query_model(button_click, x_values, y_labels, pca_data, model, svm_C, svm_gamma, metadata_columns):
     if callback_context.triggered_id != "query-model":
         return no_update, no_update, no_update
 
@@ -513,7 +514,10 @@ def query_model(button_click, x_values, y_labels, pca_data, model, svm_C, svm_ga
     query_idx = qs.query(x_values, y_values, clf)[0]
     file_id = files.loc[query_idx, filecolumn][5:]
 
-    pcas = pd.read_json(StringIO(pca_data)).loc[query_idx, ["xcol", "ycol", "zcol"]]
+    pca_loc = pd.read_json(StringIO(pca_data)).loc[query_idx, :]
+    pcas = pca_loc.loc[["xcol", "ycol", "zcol"]]
+    metadata_columns = json.loads(metadata_columns)
+    pca_metadata = list(pca_loc.loc[metadata_columns])
 
     pca_dict = {}
     for col_index, axis in enumerate(["x", "y", "z"]):
@@ -522,7 +526,7 @@ def query_model(button_click, x_values, y_labels, pca_data, model, svm_C, svm_ga
         {
             "customdata": [
                 file_id,
-            ]
+            ] + pca_metadata
         }
     )
 
