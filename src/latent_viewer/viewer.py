@@ -590,6 +590,8 @@ def download_model(n_clicks_button, svc_model):
         return no_update
 
     dt_stamp = datetime.now().strftime("%Y%m%d_%H%M")
-    clf_b64_string = bytes.fromhex(svc_model)
 
-    return dcc.send_bytes(clf_b64_string, filename=f"model_{dt_stamp}.pkl")
+    active_learning_classifier = pickle.loads(bytes.fromhex(svc_model))
+    svm = active_learning_classifier.estimator
+
+    return dcc.send_bytes(pickle.dumps(svm), filename=f"model_{dt_stamp}.pkl")
