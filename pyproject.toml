@@ -1,6 +1,6 @@
 [project]
 name = "latent-viewer"
-version = "0.0.0rc1"
+version = "0.0.0rc2"
 description = "An interactive 3D viewer for inspecting image embeddings"
 readme = "README.md"
 authors = [
