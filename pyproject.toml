@@ -19,6 +19,9 @@ dependencies = [
     "scikit-learn>=1.3.2",
 ]
 
+[project.optional-dependencies]
+dev = ["pre-commit"]
+
 license = ["GPL-2.0-or-later"]
 license-files = ["LICENSE"]
 
