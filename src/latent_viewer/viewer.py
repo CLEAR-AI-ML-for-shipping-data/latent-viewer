@@ -1,7 +1,5 @@
-import argparse
 import json
 import pickle
-import sys
 from datetime import datetime
 from io import StringIO
 from time import time
@@ -12,12 +10,11 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 from dash import Dash, Input, Output, callback, callback_context, dcc, html, no_update
-from dash_bootstrap_components import Popover, PopoverBody
+from dash_bootstrap_components import Popover
 from loguru import logger
 from plotly.subplots import make_subplots
 from skactiveml.classifier import SklearnClassifier
 from skactiveml.pool import UncertaintySampling
-from skactiveml.utils import MISSING_LABEL, labeled_indices, unlabeled_indices
 from sklearn.decomposition import PCA
 from sklearn.svm import SVC
 
