@@ -78,6 +78,66 @@ external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
 app = Dash(__name__, external_stylesheets=external_stylesheets, title="LatentViewer")
 
+gamma_description = [
+    html.H6("Gamma", id="svm-gamma-param-title"),
+    dcc.Input(
+        id="svm-gamma-param",
+        type="number",
+        value=0.03,
+        min=0,
+    ),
+    Popover(
+        [
+            "Gamma defines the reach of a single training example. "
+            "High gamma --> far reaching influence. (see ",
+            html.A(
+                "the SKLearn docs",
+                href=(
+                    "https://scikit-learn.org/stable/auto_examples/svm"
+                    "/plot_rbf_parameters.html"
+                ),
+                target="_blank",
+            ),
+            ")",
+        ],
+        target="svm-gamma-param-title",
+        id="gamma-popover",
+        trigger="click",
+        hide_arrow=False,
+        placement="top",
+    ),
+]
+
+c_regularization_description = [
+    html.H6("C", id="svm-C-param-title"),
+    dcc.Input(
+        id="svm-C-param",
+        type="number",
+        value=1.0,
+        min=0,
+    ),
+    Popover(
+        [
+            "C regularizes SVM decision function. Higher C --> more complex decision "
+            "function. (see ",
+            html.A(
+                "the SKLearn docs",
+                href=(
+                    "https://scikit-learn.org/stable/auto_examples/svm/"
+                    "plot_rbf_parameters.html"
+                ),
+                target="_blank",
+            ),
+            ")",
+        ],
+        target="svm-C-param-title",
+        id="C-popover",
+        trigger="click",
+        hide_arrow=False,
+        placement="top",
+    ),
+]
+
 app.layout = html.Div(
     [
         html.Div(
@@ -118,31 +178,7 @@ app.layout = html.Div(
                         ),
                         html.Button("Least certain trajectory?", id="query-model"),
                         html.Div(
-                            [
-                                html.H6("Gamma", id="svm-gamma-param-title"),
-                                dcc.Input(
-                                    id="svm-gamma-param",
-                                    type="number",
-                                    value=0.03,
-                                    min=0,
-                                ),
-                                Popover(
-                                    [
-                                        "Gamma defines the reach of a single training example. High gamma --> far reaching influence. (see ",
-                                        html.A(
-                                            "the SKLearn docs",
-                                            href="https://scikit-learn.org/stable/auto_examples/svm/plot_rbf_parameters.html",
-                                            target="_blank",
-                                        ),
-                                        ")",
-                                    ],
-                                    target="svm-gamma-param-title",
-                                    id="gamma-popover",
-                                    trigger="click",
-                                    hide_arrow=False,
-                                    placement="top",
-                                ),
-                            ],
+                            gamma_description,
                             style={
                                 "display": "inline-block",
                                 "text-align": "center",
@@ -150,29 +186,11 @@ app.layout = html.Div(
                             },
                         ),
                         html.Div(
-                            [
-                                html.H6("C", id="svm-C-param-title"),
-                                dcc.Input(
-                                    id="svm-C-param", type="number", value=1.0, min=0
-                                ),
-                                Popover(
-                                    [
-                                        "C regularizes SVM decision function. Higher C --> more complex decision function. (see ",
-                                        html.A(
-                                            "the SKLearn docs",
-                                            href="https://scikit-learn.org/stable/auto_examples/svm/plot_rbf_parameters.html",
-                                            target="_blank",
-                                        ),
-                                        ")",
-                                    ],
-                                    target="svm-C-param-title",
-                                    id="C-popover",
-                                    trigger="click",
-                                    hide_arrow=False,
-                                    placement="top",
-                                ),
-                            ],
-                            style={"display": "inline-block", "text-align": "center"},
+                            c_regularization_description,
+                            style={
+                                "display": "inline-block",
+                                "text-align": "center",
+                            },
                         ),
                     ],
                     id="label-prediction-container",
