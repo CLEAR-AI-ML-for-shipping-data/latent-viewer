@@ -68,6 +68,7 @@ def _no_trajectory_selected_message():
         },
     }
 
+
 def _renorm_array(image: np.ndarray) -> np.ndarray:
     """Transform array values to [0, 1] interval
 
@@ -619,7 +620,11 @@ def query_model(
     query_idx = qs.query(x_values, y_values, clf)[0]
     file_id = files.loc[query_idx, filecolumn][5:]
 
-    probabilities = clf.predict_proba(x_values.iloc[query_idx:query_idx + 1, :])
+    probabilities = clf.predict_proba(
+        x_values.iloc[query_idx:query_idx + 1, :],
+    )
+
+    logger.debug(f"Probabilities for queried item: {probabilities}")
 
     pca_loc = pd.read_json(StringIO(pca_data)).loc[query_idx, :]
     pcas = pca_loc.loc[["xcol", "ycol", "zcol"]]
@@ -637,6 +642,8 @@ def query_model(
             + pca_metadata + list(probabilities[0]),
         },
     )
+
+    logger.debug(f"{pca_dict}")
 
     clickdata = {"points": [pca_dict]}
 
