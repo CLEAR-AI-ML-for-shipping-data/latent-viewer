@@ -69,10 +69,29 @@ def _no_trajectory_selected_message():
     }
 
 
+def _renorm_array(image: np.ndarray) -> np.ndarray:
+    """Transform array values to [0, 1] interval
+
+    Args:
+        image: input array
+
+    Returns:
+        array of identical shape, with values between 0 and 1
+    """
+    if image.max() != image.min():
+        return (image - image.min()) / (image.max() - image.min())
+    else:
+        return image
+
+
 def show_hdf5_image(filename):
     with h5py.File(arrays_file) as file:
         farray = file[filename][()]
     farray = np.transpose(farray, (1, 2, 0))
+
+    for channel_idx in range(farray.shape[-1]):
+        farray[:, :, channel_idx] = _renorm_array(farray[:, :, channel_idx])
+
     while farray.shape[-1] < 3:
         farray = np.append(farray, np.zeros_like(farray)[:, :, 0:1], axis=-1)
     return px.imshow(farray)
@@ -286,6 +305,7 @@ def render_trajectory_image(hoverData: Dict, clickData, metadata_columns):
         return _no_trajectory_selected_message()
 
     metadata_columns = json.loads(metadata_columns)
+    metadata_columns += ["P_regular", "P_outlier"]
     fig = show_hdf5_image(filename)
     fig.update_layout(
         title=filename.split(
@@ -296,8 +316,11 @@ def render_trajectory_image(hoverData: Dict, clickData, metadata_columns):
 
     annotation_string = ""
     for idx, m_col_name in enumerate(metadata_columns):
-        value = metadata_dict[idx + 1]
-        annotation_string += f"{m_col_name}: {value}<br>"
+        try:
+            value = metadata_dict[idx + 1]
+            annotation_string += f"{m_col_name}: {value}<br>"
+        except IndexError:
+            pass
 
     # fig.update_layout(margin=dict(l=150))
 
@@ -597,6 +620,12 @@ def query_model(
     query_idx = qs.query(x_values, y_values, clf)[0]
     file_id = files.loc[query_idx, filecolumn][5:]
 
+    probabilities = clf.predict_proba(
+        x_values.iloc[query_idx:query_idx + 1, :],
+    )
+
+    logger.debug(f"Probabilities for queried item: {probabilities}")
+
     pca_loc = pd.read_json(StringIO(pca_data)).loc[query_idx, :]
     pcas = pca_loc.loc[["xcol", "ycol", "zcol"]]
     metadata_columns = json.loads(metadata_columns)
@@ -610,9 +639,11 @@ def query_model(
             "customdata": [
                 file_id,
             ]
-            + pca_metadata,
+            + pca_metadata + list(probabilities[0]),
         },
     )
+
+    logger.debug(f"{pca_dict}")
 
     clickdata = {"points": [pca_dict]}
 
