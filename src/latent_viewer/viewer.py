@@ -1,7 +1,5 @@
-import argparse
 import json
 import pickle
-import sys
 from datetime import datetime
 from io import StringIO
 from time import time
@@ -11,13 +9,19 @@ import h5py
 import numpy as np
 import pandas as pd
 import plotly.express as px
-from dash import Dash, Input, Output, callback, callback_context, dcc, html, no_update
-from dash_bootstrap_components import Popover, PopoverBody
+from dash import callback
+from dash import callback_context
+from dash import Dash
+from dash import dcc
+from dash import html
+from dash import Input
+from dash import no_update
+from dash import Output
+from dash_bootstrap_components import Popover
 from loguru import logger
 from plotly.subplots import make_subplots
 from skactiveml.classifier import SklearnClassifier
 from skactiveml.pool import UncertaintySampling
-from skactiveml.utils import MISSING_LABEL, labeled_indices, unlabeled_indices
 from sklearn.decomposition import PCA
 from sklearn.svm import SVC
 
@@ -41,9 +45,9 @@ def _no_matchin_data_message():
                     "yref": "paper",
                     "showarrow": False,
                     "font": {"size": 28},
-                }
+                },
             ],
-        }
+        },
     }
 
 
@@ -59,9 +63,9 @@ def _no_trajectory_selected_message():
                     "yref": "paper",
                     "showarrow": False,
                     "font": {"size": 28},
-                }
+                },
             ],
-        }
+        },
     }
 
 
@@ -76,7 +80,71 @@ def show_hdf5_image(filename):
 
 external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
-app = Dash(__name__, external_stylesheets=external_stylesheets, title="LatentViewer")
+app = Dash(
+    __name__,
+    external_stylesheets=external_stylesheets,
+    title="LatentViewer",
+)
+
+gamma_description = [
+    html.H6("Gamma", id="svm-gamma-param-title"),
+    dcc.Input(
+        id="svm-gamma-param",
+        type="number",
+        value=0.03,
+        min=0,
+    ),
+    Popover(
+        [
+            "Gamma defines the reach of a single training example. "
+            "High gamma --> far reaching influence. (see ",
+            html.A(
+                "the SKLearn docs",
+                href=(
+                    "https://scikit-learn.org/stable/auto_examples/svm"
+                    "/plot_rbf_parameters.html"
+                ),
+                target="_blank",
+            ),
+            ")",
+        ],
+        target="svm-gamma-param-title",
+        id="gamma-popover",
+        trigger="click",
+        hide_arrow=False,
+        placement="top",
+    ),
+]
+
+c_regularization_description = [
+    html.H6("C", id="svm-C-param-title"),
+    dcc.Input(
+        id="svm-C-param",
+        type="number",
+        value=1.0,
+        min=0,
+    ),
+    Popover(
+        [
+            "C regularizes SVM decision function. Higher C --> more complex decision "
+            "function. (see ",
+            html.A(
+                "the SKLearn docs",
+                href=(
+                    "https://scikit-learn.org/stable/auto_examples/svm/"
+                    "plot_rbf_parameters.html"
+                ),
+                target="_blank",
+            ),
+            ")",
+        ],
+        target="svm-C-param-title",
+        id="C-popover",
+        trigger="click",
+        hide_arrow=False,
+        placement="top",
+    ),
+]
 
 app.layout = html.Div(
     [
@@ -88,7 +156,7 @@ app.layout = html.Div(
                         "width": "100vh",
                         "height": "100vh",
                     },
-                )
+                ),
             ],
             style={
                 "width": "60%",
@@ -116,33 +184,12 @@ app.layout = html.Div(
                             ],
                             inline=True,
                         ),
-                        html.Button("Least certain trajectory?", id="query-model"),
+                        html.Button(
+                            "Least certain trajectory?",
+                            id="query-model",
+                        ),
                         html.Div(
-                            [
-                                html.H6("Gamma", id="svm-gamma-param-title"),
-                                dcc.Input(
-                                    id="svm-gamma-param",
-                                    type="number",
-                                    value=0.03,
-                                    min=0,
-                                ),
-                                Popover(
-                                    [
-                                        "Gamma defines the reach of a single training example. High gamma --> far reaching influence. (see ",
-                                        html.A(
-                                            "the SKLearn docs",
-                                            href="https://scikit-learn.org/stable/auto_examples/svm/plot_rbf_parameters.html",
-                                            target="_blank",
-                                        ),
-                                        ")",
-                                    ],
-                                    target="svm-gamma-param-title",
-                                    id="gamma-popover",
-                                    trigger="click",
-                                    hide_arrow=False,
-                                    placement="top",
-                                ),
-                            ],
+                            gamma_description,
                             style={
                                 "display": "inline-block",
                                 "text-align": "center",
@@ -150,29 +197,11 @@ app.layout = html.Div(
                             },
                         ),
                         html.Div(
-                            [
-                                html.H6("C", id="svm-C-param-title"),
-                                dcc.Input(
-                                    id="svm-C-param", type="number", value=1.0, min=0
-                                ),
-                                Popover(
-                                    [
-                                        "C regularizes SVM decision function. Higher C --> more complex decision function. (see ",
-                                        html.A(
-                                            "the SKLearn docs",
-                                            href="https://scikit-learn.org/stable/auto_examples/svm/plot_rbf_parameters.html",
-                                            target="_blank",
-                                        ),
-                                        ")",
-                                    ],
-                                    target="svm-C-param-title",
-                                    id="C-popover",
-                                    trigger="click",
-                                    hide_arrow=False,
-                                    placement="top",
-                                ),
-                            ],
-                            style={"display": "inline-block", "text-align": "center"},
+                            c_regularization_description,
+                            style={
+                                "display": "inline-block",
+                                "text-align": "center",
+                            },
                         ),
                     ],
                     id="label-prediction-container",
@@ -189,12 +218,19 @@ app.layout = html.Div(
                 html.Button("Download Model", id="btn-download-model"),
                 dcc.Download(id="download-data"),
             ],
-            style={"display": "inline-block", "vertical-align": "top", "width": "40%"},
+            style={
+                "display": "inline-block",
+                "vertical-align": "top",
+                "width": "40%",
+            },
         ),
         html.Div(
             [
                 html.Button("Like!", id="like-button"),
-                dcc.Store(id="stored-data", data={"last-clicked-time": time()}),
+                dcc.Store(
+                    id="stored-data",
+                    data={"last-clicked-time": time()},
+                ),
                 dcc.Store(id="raw-pca-data"),
                 dcc.Store(id="fitted-data"),
                 dcc.Store(id="x-values"),
@@ -205,9 +241,9 @@ app.layout = html.Div(
                 dcc.Store(id="svc-model"),
                 dcc.Store(id="metadata-column-names"),
                 dcc.Download(id="download-model"),
-            ]
+            ],
         ),
-    ]
+    ],
 )
 
 
@@ -251,7 +287,12 @@ def render_trajectory_image(hoverData: Dict, clickData, metadata_columns):
 
     metadata_columns = json.loads(metadata_columns)
     fig = show_hdf5_image(filename)
-    fig.update_layout(title=filename.split("/")[-1], margin={"l": 0, "b": 0, "r": 150})
+    fig.update_layout(
+        title=filename.split(
+            "/",
+        )[-1],
+        margin={"l": 0, "b": 0, "r": 150},
+    )
 
     annotation_string = ""
     for idx, m_col_name in enumerate(metadata_columns):
@@ -263,7 +304,7 @@ def render_trajectory_image(hoverData: Dict, clickData, metadata_columns):
     fig.add_annotation(
         dict(
             text=annotation_string,
-            x=.85,
+            x=0.85,
             y=1,
             showarrow=False,
             textangle=0,
@@ -271,7 +312,7 @@ def render_trajectory_image(hoverData: Dict, clickData, metadata_columns):
             yref="paper",
             align="left",
             xanchor="left",
-        )
+        ),
     )
 
     return fig
@@ -305,7 +346,15 @@ def plot_trajectory_points(plot_json, predicted_labels, metadata_columns):
         opacity=0.5,
         color=classcolumn,
     )
-    fig.update_layout(margin={"l": 0, "b": 0, "t": 0, "r": 0}, hovermode="closest")
+    fig.update_layout(
+        margin={
+            "l": 0,
+            "b": 0,
+            "t": 0,
+            "r": 0,
+        },
+        hovermode="closest",
+    )
     return fig
 
 
@@ -334,7 +383,10 @@ def update_related_images(clickData, plot_json):
 
     rows, cols = 3, 3
     fig = make_subplots(
-        rows=rows, cols=cols, horizontal_spacing=0.1, vertical_spacing=0.01
+        rows=rows,
+        cols=cols,
+        horizontal_spacing=0.1,
+        vertical_spacing=0.01,
     )
     for i in range(min(rows * cols, len(rown_nr_sorted_by_distance) - 1)):
         plot_row = i // cols + 1
@@ -342,14 +394,20 @@ def update_related_images(clickData, plot_json):
         df_index = rown_nr_sorted_by_distance[i + 1]
         filename = plot_df.iloc[df_index].loc[filecolumn]
 
-        fig.add_trace(show_hdf5_image(filename).data[0], row=plot_row, col=plot_col)
+        fig.add_trace(
+            show_hdf5_image(
+                filename,
+            ).data[0],
+            row=plot_row,
+            col=plot_col,
+        )
 
     fig.update_layout(
         {
             ax: {"visible": False, "matches": None}
             for ax in fig.to_dict()["layout"]
             if "axis" in ax
-        }
+        },
     )
     fig.update_layout(margin={"l": 0, "b": 0, "t": 50, "r": 0})
     return fig
@@ -365,20 +423,28 @@ def update_raw_pca_data(n_clicks):
     edf = pd.read_csv(embeddings_file, sep=";", index_col=0)
     df = edf.copy()
 
-    embeddings_columns = [col for col in df.columns if col.startswith(emb_dim_prefix)]
+    embeddings_columns = [
+        col for col in df.columns if col.startswith(emb_dim_prefix)
+    ]
     if len(embeddings_columns) == 0:
-        logger.error(f"No embedding columns found with prefix {emb_dim_prefix}")
+        logger.error(
+            f"No embedding columns found with prefix {emb_dim_prefix}",
+        )
     logger.info(f"{df.columns}")
     logger.info(f"{classcolumn}")
     if classcolumn not in df.columns:
-        logger.warning(f"Label column '{classcolumn}' not found, adding it instead")
-        df[classcolumn] = 'regular'
+        logger.warning(
+            f"Label column '{classcolumn}' not found, adding it instead",
+        )
+        df[classcolumn] = "regular"
 
     known_columns = embeddings_columns + [filecolumn, classcolumn]
     metadata_columns = [col for col in df.columns if col not in known_columns]
 
     pca_decomposer = PCA()
-    pca_vectors = pca_decomposer.fit_transform(df.loc[:, embeddings_columns].values)
+    pca_vectors = pca_decomposer.fit_transform(
+        df.loc[:, embeddings_columns].values,
+    )
 
     xvalues = df.loc[:, embeddings_columns]
     xvalues = pca_vectors[:, :3]
@@ -406,9 +472,13 @@ def update_raw_pca_data(n_clicks):
 def set_initial_xy_values(dataf):
     df = pd.read_json(StringIO(dataf))
 
-    embeddings_columns = [col for col in df.columns if col.startswith(emb_dim_prefix)]
+    embeddings_columns = [
+        col for col in df.columns if col.startswith(emb_dim_prefix)
+    ]
     if len(embeddings_columns) == 0:
-        logger.error(f"No embedding columns found with prefix {emb_dim_prefix}")
+        logger.error(
+            f"No embedding columns found with prefix {emb_dim_prefix}",
+        )
 
     x_values = df.loc[
         :,
@@ -469,7 +539,7 @@ def update_label(all_labels, click_data, label):
 
 @callback(Input("y-labeled", "data"))
 def print_labels(labels):
-    ldf = pd.read_json(StringIO(labels))["label"].values
+    ldf: pd.arrays.ArrayLike = pd.read_json(StringIO(labels))["label"].values
     logger.debug(f"Currently labeled values: {ldf[ldf >= 0]}")
 
 
@@ -487,7 +557,16 @@ def print_labels(labels):
     Input("metadata-column-names", "data"),
     prevent_initial_call="initial_duplicate",
 )
-def query_model(button_click, x_values, y_labels, pca_data, model, svm_C, svm_gamma, metadata_columns):
+def query_model(
+    button_click,
+    x_values,
+    y_labels,
+    pca_data,
+    model,
+    svm_C,
+    svm_gamma,
+    metadata_columns,
+):
     if callback_context.triggered_id != "query-model":
         return no_update, no_update, no_update
 
@@ -495,7 +574,9 @@ def query_model(button_click, x_values, y_labels, pca_data, model, svm_C, svm_ga
         clf: SklearnClassifier = pickle.loads(bytes.fromhex(model))
     else:
         clf = SklearnClassifier(
-            SVC(probability=True, kernel="rbf"), classes=[0, 1], missing_label=-1
+            SVC(probability=True, kernel="rbf"),
+            classes=[0, 1],
+            missing_label=-1,
         )
     logger.debug(f"Using model of type {type(clf)}")
 
@@ -509,7 +590,9 @@ def query_model(button_click, x_values, y_labels, pca_data, model, svm_C, svm_ga
     clf.fit(x_values, y_values)
 
     qs = UncertaintySampling(
-        method="least_confident", random_state=42, missing_label=-1
+        method="least_confident",
+        random_state=42,
+        missing_label=-1,
     )
     query_idx = qs.query(x_values, y_values, clf)[0]
     file_id = files.loc[query_idx, filecolumn][5:]
@@ -526,14 +609,17 @@ def query_model(button_click, x_values, y_labels, pca_data, model, svm_C, svm_ga
         {
             "customdata": [
                 file_id,
-            ] + pca_metadata
-        }
+            ]
+            + pca_metadata,
+        },
     )
 
     clickdata = {"points": [pca_dict]}
 
     files[classcolumn] = clf.predict(x_values)
-    files[classcolumn] = files[classcolumn].apply(lambda x: ["Regular", "Outlier"][x])
+    files[classcolumn] = files[classcolumn].apply(
+        lambda x: ["Regular", "Outlier"][x],
+    )
     out_clf = pickle.dumps(clf).hex()
     return clickdata, out_clf, files.to_json()
 
