@@ -19,7 +19,7 @@ def main():
         required=True,
     )
     parser.add_argument(
-        "-a", "--image-archive", help="Trajectory image archive (hdf5)", required=True
+        "-a", "--image-archive", help="Trajectory image archive (hdf5)", required=True,
     )
     parser.add_argument(
         "-f",
@@ -28,7 +28,7 @@ def main():
         default="filename",
     )
     parser.add_argument(
-        "-d", "--debug", help="Run in debug mode", type=bool, default=False
+        "-d", "--debug", help="Run in debug mode", type=bool, default=False,
     )
     parser.add_argument(
         "-p",
@@ -38,7 +38,7 @@ def main():
         default="emb_dim",
     )
     parser.add_argument(
-        "-c", "--class-column", help="Name of class column", type=str, default="class"
+        "-c", "--class-column", help="Name of class column", type=str, default="class",
     )
 
     args = parser.parse_args()
