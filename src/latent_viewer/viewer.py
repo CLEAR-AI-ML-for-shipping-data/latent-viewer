@@ -33,7 +33,12 @@ emb_dim_prefix = None
 ENCODING = "utf-16-le"
 
 
-def _no_matchin_data_message():
+def _no_matchin_data_message() -> dict:
+    """Display a message when there is no matching data.
+
+    Returns:
+        dictionary with options to display the message
+    """
     return {
         "layout": {
             "xaxis": {"visible": False},
