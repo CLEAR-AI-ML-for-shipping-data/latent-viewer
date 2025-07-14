@@ -8,6 +8,7 @@ from typing import Dict
 import h5py
 import numpy as np
 import pandas as pd
+import plotly
 import plotly.express as px
 from dash import callback
 from dash import callback_context
@@ -94,7 +95,15 @@ def _renorm_array(image: np.ndarray) -> np.ndarray:
         return image
 
 
-def show_hdf5_image(filename):
+def show_hdf5_image(filename: str) -> plotly.graph_objs.Figure:
+    """Create a plotly express image rendering.
+
+    Args:
+        filename: HDF5 dataset to be displayed
+
+    Returns:
+        the rendered Figure
+    """
     with h5py.File(arrays_file) as file:
         farray = file[filename][()]
     farray = np.transpose(farray, (1, 2, 0))
