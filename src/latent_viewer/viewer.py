@@ -290,14 +290,25 @@ app.layout = html.Div(
     Output("stored-data", "data"),
     Input("stored-data", "data"),
     Input("scatter-plot-container", "n_clicks"),
-    Input("trajectories-scatter", "clickData"),
     prevent_initial_call=True,
 )
-def update_stored_data(stored_data, n_clicks, clicked_data):
+def update_stored_data(stored_data: dict, _) -> tuple:
+    """Reset clicked data point to None after a double-click.
+
+    Args:
+        stored_data: has time of previous click inside scatter-plot-container
+        _: we only need to know whether the scatter-plot-container was clicked
+
+    Returns:
+        ([None | no_update], [{'last-clicked-time': now} | no_update])
+    """
     changed_inputs = [x["prop_id"] for x in callback_context.triggered]
+    # Only change something if there was a click inside scatter-plot-container
     if "scatter-plot-container.n_clicks" in changed_inputs:
+        # If there is less than 0.3 sec between clicks, reset selected data point
         now = time()
         if now - stored_data["last-clicked-time"] < 0.3:
+            logger.debug("Reset clicked data point")
             return None, {"last-clicked-time": now}
         else:
             return no_update, {"last-clicked-time": now}
