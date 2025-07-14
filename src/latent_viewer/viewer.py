@@ -56,7 +56,12 @@ def _no_matchin_data_message() -> dict:
     }
 
 
-def _no_trajectory_selected_message():
+def _no_trajectory_selected_message() -> dict:
+    """Show a 'no trajectory selected' message.
+
+    Returns:
+        dictionary with options to display the message
+    """
     return {
         "layout": {
             "xaxis": {"visible": False},
