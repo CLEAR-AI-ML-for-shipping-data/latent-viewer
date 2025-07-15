@@ -20,10 +20,14 @@ repos:
   #     - id: reorder-python-imports
   #       exclude: ^(pre_commit/resources/|testing/resources/python3_hooks_repo/)
   #       args: ["--application-directories=.:analysis"]
-  - repo: https://github.com/asottile/add-trailing-comma
-    rev: v3.2.0
+  # - repo: https://github.com/asottile/add-trailing-comma
+  #   rev: v3.2.0
+  #   hooks:
+  #     - id: add-trailing-comma
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
     hooks:
-      - id: add-trailing-comma
+      - id: black
   - repo: https://github.com/hhatto/autopep8
     rev: v2.3.2
     hooks:
