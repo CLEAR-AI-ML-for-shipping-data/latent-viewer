@@ -3,22 +3,14 @@ import pickle
 from datetime import datetime
 from io import StringIO
 from time import time
-from typing import Dict
-from typing import Union
+from typing import Dict, Union
 
 import h5py
 import numpy as np
 import pandas as pd
 import plotly
 import plotly.express as px
-from dash import callback
-from dash import callback_context
-from dash import Dash
-from dash import dcc
-from dash import html
-from dash import Input
-from dash import no_update
-from dash import Output
+from dash import Dash, Input, Output, callback, callback_context, dcc, html, no_update
 from dash_bootstrap_components import Popover
 from loguru import logger
 from plotly.subplots import make_subplots
