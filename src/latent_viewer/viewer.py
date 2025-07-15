@@ -4,6 +4,7 @@ from datetime import datetime
 from io import StringIO
 from time import time
 from typing import Dict
+from typing import Union
 
 import h5py
 import numpy as np
@@ -319,12 +320,26 @@ def update_stored_data(stored_data: dict, _) -> tuple:
 @callback(
     Output("show-trajectory", "figure"),
     Input("trajectories-scatter", "hoverData"),
-    # Input("trajectories-scatter", "clickData"),
     Input("selected-data-point", "data"),
     Input("metadata-column-names", "data"),
     prevent_initial_call=True,
 )
-def render_trajectory_image(hoverData: Dict, clickData, metadata_columns):
+def render_trajectory_image(
+    hoverData: Union[dict, None],
+    clickData: Union[Dict, None],
+    metadata_columns_json: str,
+) -> Union[plotly.graph_objs.Figure, dict]:
+    """Render the main image.
+
+    Args:
+        hoverData: the datapoint on which the cursor hovered last
+        clickData: a datapoint selected by being clicked
+        metadata_columns: column names to be displayed next to the image
+
+    Returns:
+        a figure to be shown in the top right of the interface
+    """
+    # If there is no selected data point, show a message about this
     if clickData is not None:
         filename = clickData["points"][0]["customdata"][0]
         metadata_dict = clickData["points"][0]["customdata"]
@@ -334,7 +349,8 @@ def render_trajectory_image(hoverData: Dict, clickData, metadata_columns):
     else:
         return _no_trajectory_selected_message()
 
-    metadata_columns = json.loads(metadata_columns)
+    metadata_columns: list[str] = json.loads(metadata_columns_json)
+    # Add classification probabilities to metadata
     metadata_columns += ["P_regular", "P_outlier"]
     fig = show_hdf5_image(filename)
     fig.update_layout(
@@ -344,15 +360,16 @@ def render_trajectory_image(hoverData: Dict, clickData, metadata_columns):
         margin={"l": 0, "b": 0, "r": 150},
     )
 
+    # Show metatdata values
     annotation_string = ""
     for idx, m_col_name in enumerate(metadata_columns):
+        # Class probabilities are only present after querying the model,
+        # deal with this through a try-except
         try:
             value = metadata_dict[idx + 1]
             annotation_string += f"{m_col_name}: {value}<br>"
         except IndexError:
             pass
-
-    # fig.update_layout(margin=dict(l=150))
 
     fig.add_annotation(
         dict(
