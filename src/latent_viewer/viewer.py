@@ -3,7 +3,7 @@ import pickle
 from datetime import datetime
 from io import StringIO
 from time import time
-from typing import Dict, Union
+from typing import Any, Dict, Union
 
 import h5py
 import numpy as np
@@ -439,7 +439,20 @@ def plot_trajectory_points(
     Input("trajectories-scatter", "clickData"),
     Input("raw-pca-data", "data"),
 )
-def update_related_images(clickData, plot_json):
+def update_related_images(
+    clickData: Union[dict, None], plot_json: str
+) -> Union[plotly.graph_objs.Figure, dict]:
+    """Show the nine images whose embeddings are closest to the selected one.
+
+    Args:
+        clickData: the clicked data point
+        plot_json: PCA data of the embeddings
+
+    Returns:
+        3x3 grid of related images, or a message saying there are none
+    """
+    # due to rendering speed, we only show related images on a clicked data point,
+    # not on a hovered point
     if clickData is None:
         return _no_matchin_data_message()
 
@@ -495,13 +508,24 @@ def update_related_images(clickData, plot_json):
     Output("metadata-column-names", "data"),
     Input("like-button", "n_clicks"),
 )
-def update_raw_pca_data(n_clicks):
+def update_raw_pca_data(_: Any) -> tuple:
+    """Perform initial embedding data parsing.
+
+    Args:
+        _: Any type of input on start-up, for now solved with a like-button
+
+    Returns:
+        PCA(3) of embedding vectors, embeddings dataframe, and metadata column names
+
+    Raises:
+        ValueError: if no embedding file has been provided
+    """
+    if embeddings_file is None:
+        raise ValueError("No embeddings file provided")
     edf = pd.read_csv(embeddings_file, sep=";", index_col=0)
     df = edf.copy()
 
-    embeddings_columns = [
-        col for col in df.columns if col.startswith(emb_dim_prefix)
-    ]
+    embeddings_columns = [col for col in df.columns if col.startswith(emb_dim_prefix)]
     if len(embeddings_columns) == 0:
         logger.error(
             f"No embedding columns found with prefix {emb_dim_prefix}",
@@ -525,7 +549,8 @@ def update_raw_pca_data(n_clicks):
     xvalues = df.loc[:, embeddings_columns]
     xvalues = pca_vectors[:, :3]
 
-    plot_df = df[[filecolumn, classcolumn] + metadata_columns].copy()
+    # Force to dataframe to make the linter happy
+    plot_df = pd.DataFrame(df[[filecolumn, classcolumn] + metadata_columns].copy())
 
     plot_df[filecolumn] = plot_df[filecolumn].apply(lambda x: f"file_{x}")
     plot_df["xcol"] = xvalues[:, 0]
@@ -545,17 +570,27 @@ def update_raw_pca_data(n_clicks):
     Input("fitted-data", "data"),
     prevent_initial_call="initial_duplicate",
 )
-def set_initial_xy_values(dataf):
-    df = pd.read_json(StringIO(dataf))
+def set_initial_xy_values(dataf: str) -> tuple:
+    """Set the initial values for model input and output.
 
-    embeddings_columns = [
-        col for col in df.columns if col.startswith(emb_dim_prefix)
-    ]
+    Fitted-data gets only one update, on start-up, so this function will run only once
+    during the execution lifetime.
+
+    Args:
+        dataf: json string for original dataframe
+
+    Returns:
+        dataframe with filename and embeddings, label indicator, predicted class
+    """
+    df = pd.DataFrame(pd.read_json(StringIO(dataf)))
+
+    embeddings_columns = [col for col in df.columns if col.startswith(emb_dim_prefix)]
     if len(embeddings_columns) == 0:
         logger.error(
             f"No embedding columns found with prefix {emb_dim_prefix}",
         )
 
+    # x_values is just filename and embeddings
     x_values = df.loc[
         :,
         [
@@ -564,9 +599,11 @@ def set_initial_xy_values(dataf):
         + embeddings_columns,
     ]
 
+    # Use -1 to set every data point to unlabeled
     y_labeled = df.loc[:, [filecolumn]].copy()
     y_labeled["label"] = -1
 
+    # Initial class prediction is "Regular" for every data point
     y_prediction = df.loc[:, [filecolumn]].copy()
     y_prediction[classcolumn] = "Regular"
 
@@ -576,19 +613,30 @@ def set_initial_xy_values(dataf):
 @callback(
     Output("label-selector", "value"),
     Output("label-selector", "style"),
-    # Input("trajectories-scatter", "clickData"),
     Input("selected-data-point", "data"),
     Input("y-labeled", "data"),
 )
-def display_label_container(click_data, labels):
+def display_label_container(
+    click_data: Union[dict, None], labels_str: str
+) -> tuple[int, dict]:
+    """Render labeling interface
+
+    Args:
+        click_data: the selected data point
+        labels_str: dataframe json with human-assigned labels
+
+    Returns:
+        the human-assigned label, and the rendering style
+    """
+    # Only render on click, not on hover
     if click_data is None:
         return -1, {"visibility": "hidden"}
 
     trajectory_id = f"file_{click_data['points'][0]['customdata'][0]}"
     logger.debug({f"Selected trajectory {trajectory_id}"})
 
-    labels = pd.read_json(StringIO(labels))
-    label = labels[labels[filecolumn] == trajectory_id]["label"].iloc[0]
+    labels = pd.read_json(StringIO(labels_str))
+    label: int = labels[labels[filecolumn] == trajectory_id]["label"].iloc[0]
 
     logger.debug(f"Current label: {label}")
     return label, {"visibility": "visible"}
@@ -615,7 +663,9 @@ def update_label(all_labels, click_data, label):
 
 @callback(Input("y-labeled", "data"))
 def print_labels(labels):
-    ldf: pd.arrays.ArrayLike = pd.read_json(StringIO(labels))["label"].values
+    ldf: pd.arrays.ArrayLike = pd.DataFrame(pd.read_json(StringIO(labels)))[
+        "label"
+    ].values
     logger.debug(f"Currently labeled values: {ldf[ldf >= 0]}")
 
 
@@ -634,15 +684,31 @@ def print_labels(labels):
     prevent_initial_call="initial_duplicate",
 )
 def query_model(
-    button_click,
-    x_values,
-    y_labels,
-    pca_data,
-    model,
-    svm_C,
-    svm_gamma,
-    metadata_columns,
-):
+    button_click: Any,
+    x_values_str: str,
+    y_labels_str: str,
+    pca_data: str,
+    model: Union[str, None],
+    svm_C: float,
+    svm_gamma: float,
+    metadata_columns: str,
+) -> tuple:
+    """Query the model for the least confident data point.
+
+    Args:
+        button_click: trigger for function call
+        x_values_str: json string for embedding dataframe
+        y_labels_str: json string for label dataframe
+        pca_data: json string for PCA(3) of the embeddings
+        model: hexstring containing SVC model
+        svm_C: SVC C hyperparameter
+        svm_gamma: SVC gamma hyperparameter
+        metadata_columns: json string containing list of metadata columns
+
+    Returns:
+        clickdata for queried data point, retrained SVC model, y_pred from new model
+    """
+    # Only run when the query-model button has been clicked
     if callback_context.triggered_id != "query-model":
         return no_update, no_update, no_update
 
@@ -658,11 +724,11 @@ def query_model(
 
     clf.estimator.set_params(C=svm_C, gamma=svm_gamma)
 
-    x_values = pd.read_json(StringIO(x_values))
+    x_values = pd.read_json(StringIO(x_values_str))
     files = x_values[[filecolumn]].copy()
 
     x_values = x_values.drop(columns=filecolumn)
-    y_values = pd.read_json(StringIO(y_labels))["label"].values
+    y_values = pd.read_json(StringIO(y_labels_str))["label"].values
     clf.fit(x_values, y_values)
 
     qs = UncertaintySampling(
@@ -674,11 +740,12 @@ def query_model(
     file_id = files.loc[query_idx, filecolumn][5:]
 
     probabilities = clf.predict_proba(
-        x_values.iloc[query_idx:query_idx + 1, :],
+        x_values.iloc[query_idx : query_idx + 1, :],
     )
 
     logger.debug(f"Probabilities for queried item: {probabilities}")
 
+    # Locate the queried data point in PCA(3) space
     pca_loc = pd.read_json(StringIO(pca_data)).loc[query_idx, :]
     pcas = pca_loc.loc[["xcol", "ycol", "zcol"]]
     metadata_columns = json.loads(metadata_columns)
@@ -692,7 +759,8 @@ def query_model(
             "customdata": [
                 file_id,
             ]
-            + pca_metadata + list(probabilities[0]),
+            + pca_metadata
+            + list(probabilities[0]),
         },
     )
 
@@ -709,7 +777,12 @@ def query_model(
 
 
 @callback(Input("selected-data-point", "data"))
-def show_click_data(clickData):
+def show_click_data(clickData: dict):
+    """Log properties of selected data point for debugging purposes.
+
+    Args:
+        clickData: data of selected data point
+    """
     logger.debug(f"Updating selected data point to: {clickData}")
 
 
@@ -718,7 +791,18 @@ def show_click_data(clickData):
     Input("trajectories-scatter", "clickData"),
     Input("queried-data-point", "data"),
 )
-def update_selection(clickData, queryData):
+def update_selection(clickData: dict, queryData: dict) -> dict:
+    """Update selected data point to queried data point after model querying.
+
+    This is necessary to show the image selected by the SVM querying.
+
+    Args:
+        clickData: a clicked data point
+        queryData: data point selected by SVM querying
+
+    Returns:
+        data point dictionary
+    """
     if "trajectories-scatter.clickData" in callback_context.triggered_prop_ids.keys():
         return clickData
     else:
@@ -734,12 +818,30 @@ def update_selection(clickData, queryData):
     Input("y-predicted", "data"),
     prevent_initial_call=True,
 )
-def download_excel(n_clicks_excel, n_clicks_csv, x_values, y_labeled, y_predicted):
+def download_excel(
+    _n_clicks_excel: int,
+    _n_clicks_csv: int,
+    x_values_str: str,
+    y_labeled_str: str,
+    y_predicted_str: str,
+):
+    """Download data and class predictions.
+
+    Args:
+        _n_clicks_excel: trigger to download as Excel file
+        _n_clicks_csv: trigger to download as CSV file
+        x_values_str: json string containing embedding dataframe
+        y_labeled_str: json string containing human-assigned labels
+        y_predicted_str: json string containing model predictions
+
+    Returns:
+        downloadable XLSX/CSV file
+    """
     if callback_context.triggered_id not in ["btn-download-excel", "btn-download-csv"]:
         return no_update
-    x_values = pd.read_json(StringIO(x_values))
-    y_labeled = pd.read_json(StringIO(y_labeled))
-    y_predicted = pd.read_json(StringIO(y_predicted))
+    x_values = pd.read_json(StringIO(x_values_str))
+    y_labeled = pd.read_json(StringIO(y_labeled_str))
+    y_predicted = pd.read_json(StringIO(y_predicted_str))
     out_df = pd.merge(x_values, y_labeled, on=filecolumn)
     out_df = pd.merge(out_df, y_predicted, on=filecolumn)
 
@@ -755,7 +857,16 @@ def download_excel(n_clicks_excel, n_clicks_csv, x_values, y_labeled, y_predicte
     Input("svc-model", "data"),
     prevent_initial_call=True,
 )
-def download_model(n_clicks_button, svc_model):
+def download_model(_n_clicks_button: int, svc_model: str):
+    """Download the bytestring version of the SVC model.
+
+    Args:
+        _n_clicks_button: trigger for download
+        svc_model: hex bytestring of SVC model
+
+    Returns:
+        model download
+    """
     if callback_context.triggered_id != "btn-download-model":
         return no_update
 
