@@ -386,9 +386,23 @@ def render_trajectory_image(
     Input("y-predicted", "data"),
     Input("metadata-column-names", "data"),
 )
-def plot_trajectory_points(plot_json, predicted_labels, metadata_columns):
+def plot_trajectory_points(
+    plot_json: str,
+    predicted_labels: str,
+    metadata_columns_json: str,
+) -> plotly.graph_objs.Figure:
+    """Plot the 3D embeddings of the images.
+
+    Args:
+        plot_json: json-string with embedding data after PCA
+        predicted_labels: predicted classification of images
+        metadata_columns: columns containing metadata to be displayed next to the image
+
+    Returns:
+        3D scatterplot of image embeddings
+    """
     plot_df = pd.read_json(StringIO(plot_json))
-    metadata_columns = json.loads(metadata_columns)
+    metadata_columns = json.loads(metadata_columns_json)
 
     if predicted_labels is not None:
         plabels = pd.read_json(StringIO(predicted_labels))
