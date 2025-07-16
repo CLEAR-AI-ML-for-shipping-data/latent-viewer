@@ -21,7 +21,10 @@ license = "GPL-2.0-or-later"
 license-files = ["LICENSE"]
 
 [project.optional-dependencies]
-dev = ["pre-commit"]
+dev = [
+    "pre-commit>=4.2.0",
+    "twine>=6.1.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/CLEAR-AI-ML-for-shipping-data/latent-viewer"
