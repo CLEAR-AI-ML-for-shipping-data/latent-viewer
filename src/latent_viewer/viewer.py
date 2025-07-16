@@ -682,6 +682,7 @@ def print_labels(labels):
     Input("svm-C-param", "value"),
     Input("svm-gamma-param", "value"),
     Input("metadata-column-names", "data"),
+    Input("metadata-column-selector", "value"),
     Input("embedding-column-names", "data"),
     prevent_initial_call="initial_duplicate",
 )
@@ -694,6 +695,7 @@ def query_model(
     svm_C: float,
     svm_gamma: float,
     metadata_columns: str,
+    selected_metadata_columns: list,
     embeddings_columns_str: str,
 ) -> tuple:
     """Query the model for the least confident data point.
@@ -707,6 +709,7 @@ def query_model(
         svm_C: SVC C hyperparameter
         svm_gamma: SVC gamma hyperparameter
         metadata_columns: json string containing list of metadata columns
+        selected_metadata_columns: list of metadata columns for model input
         embeddings_columns_str: json string containing list of embedding column names
 
     Returns:
@@ -732,7 +735,12 @@ def query_model(
     full_data = pd.read_json(StringIO(x_values_str))
     files = full_data[[filecolumn]].copy()
 
-    x_values = full_data[embeddings_columns]
+    x_columns = embeddings_columns
+    if selected_metadata_columns is not None:
+        x_columns += selected_metadata_columns
+
+    logger.debug(f"Using columns {x_columns}")
+    x_values = full_data[x_columns]
     y_values = pd.read_json(StringIO(y_labels_str))["label"].values
     clf.fit(x_values, y_values)
 
