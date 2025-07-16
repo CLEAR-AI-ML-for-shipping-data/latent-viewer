@@ -13,6 +13,7 @@ dependencies = [
     "h5py>=3.11.0",
     "loguru>=0.7.3",
     "numpy>=1.24.4",
+    "openpyxl>=3.2.5",
     "pandas>=2.0.3",
     "plotly>=6.0.1",
     "scikit-activeml>=0.2.2",
