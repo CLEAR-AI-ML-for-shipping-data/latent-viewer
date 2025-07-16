@@ -235,6 +235,15 @@ app.layout = html.Div(
                                 "text-align": "center",
                             },
                         ),
+                        html.Div(
+                            [
+                                dcc.Checklist(
+                                    id="metadata-column-selector",
+                                    inline=True,
+                                )
+                            ],
+                            id="metadata-column-selector-container",
+                        ),
                     ],
                     id="label-prediction-container",
                     style={"inline": "true"},
@@ -877,3 +886,23 @@ def download_model(_n_clicks_button: int, svc_model: str):
     svm = active_learning_classifier.estimator
 
     return dcc.send_bytes(pickle.dumps(svm), filename=f"model_{dt_stamp}.pkl")
+
+
+@callback(
+    Output("metadata-column-selector", "options"),
+    Input("metadata-column-names", "data"),
+    prevent_initial_call=True,
+)
+def set_metadata_column_options(column_names_str: str):
+    """Populate the metadata column list with column names
+
+    Args:
+        column_names_str: column names list formatted as JSON string
+
+    Returns:
+        a mapping of {column_name : column_name}
+    """
+    column_names = json.loads(column_names_str)
+    column_names_dict = {name: name for name in column_names}
+    logger.debug(f"Column names dictionary: {column_names_dict}")
+    return column_names_dict
