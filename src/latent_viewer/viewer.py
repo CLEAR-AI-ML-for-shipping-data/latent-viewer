@@ -1,5 +1,6 @@
 import json
 import pickle
+import pprint
 from datetime import datetime
 from io import StringIO
 from time import time
@@ -530,8 +531,8 @@ def update_raw_pca_data(_: Any) -> tuple:
         logger.error(
             f"No embedding columns found with prefix {emb_dim_prefix}",
         )
-    logger.info(f"{df.columns}")
-    logger.info(f"{classcolumn}")
+    logger.debug(f"Embedding file columns: {pprint.pformat(list(df.columns))}")
+    logger.info(f"Label column: '{classcolumn}'")
     if classcolumn not in df.columns:
         logger.warning(
             f"Label column '{classcolumn}' not found, adding it instead",
