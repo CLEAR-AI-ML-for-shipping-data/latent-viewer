@@ -1,6 +1,6 @@
 [project]
 name = "latent-viewer"
-version = "0.0.0rc2"
+version = "0.0.0"
 description = "An interactive 3D viewer for inspecting image embeddings"
 readme = "README.md"
 authors = [{ name = "Leon Boschman", email = "leon.boschman@chalmers.se" }]
