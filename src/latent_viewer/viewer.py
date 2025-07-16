@@ -274,13 +274,13 @@ app.layout = html.Div(
                 ),
                 dcc.Store(id="raw-pca-data"),
                 dcc.Store(id="fitted-data"),
-                dcc.Store(id="x-values"),
                 dcc.Store(id="y-labeled"),
                 dcc.Store(id="y-predicted"),
                 dcc.Store(id="selected-data-point"),
                 dcc.Store(id="queried-data-point"),
                 dcc.Store(id="svc-model"),
                 dcc.Store(id="metadata-column-names"),
+                dcc.Store(id="embedding-column-names"),
                 dcc.Download(id="download-model"),
             ],
         ),
@@ -574,9 +574,9 @@ def update_raw_pca_data(_: Any) -> tuple:
 
 
 @callback(
-    Output("x-values", "data"),
     Output("y-labeled", "data", allow_duplicate=True),
     Output("y-predicted", "data", allow_duplicate=True),
+    Output("embedding-column-names", "data"),
     Input("fitted-data", "data"),
     prevent_initial_call="initial_duplicate",
 )
@@ -590,7 +590,7 @@ def set_initial_xy_values(dataf: str) -> tuple:
         dataf: json string for original dataframe
 
     Returns:
-        dataframe with filename and embeddings, label indicator, predicted class
+        label indicator, predicted class, and list of embeddings columns
     """
     df = pd.DataFrame(pd.read_json(StringIO(dataf)))
 
@@ -600,15 +600,6 @@ def set_initial_xy_values(dataf: str) -> tuple:
             f"No embedding columns found with prefix {emb_dim_prefix}",
         )
 
-    # x_values is just filename and embeddings
-    x_values = df.loc[
-        :,
-        [
-            filecolumn,
-        ]
-        + embeddings_columns,
-    ]
-
     # Use -1 to set every data point to unlabeled
     y_labeled = df.loc[:, [filecolumn]].copy()
     y_labeled["label"] = -1
@@ -617,7 +608,7 @@ def set_initial_xy_values(dataf: str) -> tuple:
     y_prediction = df.loc[:, [filecolumn]].copy()
     y_prediction[classcolumn] = "Regular"
 
-    return x_values.to_json(), y_labeled.to_json(), y_prediction.to_json()
+    return y_labeled.to_json(), y_prediction.to_json(), json.dumps(embeddings_columns)
 
 
 @callback(
@@ -684,13 +675,14 @@ def print_labels(labels):
     Output("svc-model", "data"),
     Output("y-predicted", "data", allow_duplicate=True),
     Input("query-model", "n_clicks"),
-    Input("x-values", "data"),
+    Input("fitted-data", "data"),
     Input("y-labeled", "data"),
     Input("raw-pca-data", "data"),
     Input("svc-model", "data"),
     Input("svm-C-param", "value"),
     Input("svm-gamma-param", "value"),
     Input("metadata-column-names", "data"),
+    Input("embedding-column-names", "data"),
     prevent_initial_call="initial_duplicate",
 )
 def query_model(
@@ -702,6 +694,7 @@ def query_model(
     svm_C: float,
     svm_gamma: float,
     metadata_columns: str,
+    embeddings_columns_str: str,
 ) -> tuple:
     """Query the model for the least confident data point.
 
@@ -714,6 +707,7 @@ def query_model(
         svm_C: SVC C hyperparameter
         svm_gamma: SVC gamma hyperparameter
         metadata_columns: json string containing list of metadata columns
+        embeddings_columns_str: json string containing list of embedding column names
 
     Returns:
         clickdata for queried data point, retrained SVC model, y_pred from new model
@@ -734,10 +728,11 @@ def query_model(
 
     clf.estimator.set_params(C=svm_C, gamma=svm_gamma)
 
-    x_values = pd.read_json(StringIO(x_values_str))
-    files = x_values[[filecolumn]].copy()
+    embeddings_columns: list[str] = json.loads(embeddings_columns_str)
+    full_data = pd.read_json(StringIO(x_values_str))
+    files = full_data[[filecolumn]].copy()
 
-    x_values = x_values.drop(columns=filecolumn)
+    x_values = full_data[embeddings_columns]
     y_values = pd.read_json(StringIO(y_labels_str))["label"].values
     clf.fit(x_values, y_values)
 
@@ -823,7 +818,7 @@ def update_selection(clickData: dict, queryData: dict) -> dict:
     Output("download-data", "data"),
     Input("btn-download-excel", "n_clicks"),
     Input("btn-download-csv", "n_clicks"),
-    Input("x-values", "data"),
+    Input("fitted-data", "data"),
     Input("y-labeled", "data"),
     Input("y-predicted", "data"),
     prevent_initial_call=True,
@@ -849,7 +844,7 @@ def download_excel(
     """
     if callback_context.triggered_id not in ["btn-download-excel", "btn-download-csv"]:
         return no_update
-    x_values = pd.read_json(StringIO(x_values_str))
+    x_values = pd.read_json(StringIO(x_values_str)).drop(columns=classcolumn)
     y_labeled = pd.read_json(StringIO(y_labeled_str))
     y_predicted = pd.read_json(StringIO(y_predicted_str))
     out_df = pd.merge(x_values, y_labeled, on=filecolumn)
