@@ -268,7 +268,11 @@ app.layout = html.Div(
                                 dcc.Checklist(
                                     id="metadata-column-selector",
                                     inline=True,
-                                )
+                                    labelStyle={
+                                        "margin-right": "8pt",
+                                    },
+                                    inputStyle={"margin-right": "2pt"},
+                                ),
                             ],
                             id="metadata-column-selector-container",
                         ),
