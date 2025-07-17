@@ -6,13 +6,21 @@ from io import StringIO
 from time import time
 from typing import Any, Dict, Union
 
+import dash_bootstrap_components
 import h5py
 import numpy as np
 import pandas as pd
 import plotly
 import plotly.express as px
 from dash import Dash, Input, Output, callback, callback_context, dcc, html, no_update
-from dash_bootstrap_components import Popover
+from dash_bootstrap_components import (
+    Modal,
+    ModalBody,
+    ModalFooter,
+    ModalHeader,
+    ModalTitle,
+    Popover,
+)
 from loguru import logger
 from plotly.subplots import make_subplots
 from skactiveml.classifier import SklearnClassifier
@@ -110,7 +118,10 @@ def show_hdf5_image(filename: str) -> plotly.graph_objs.Figure:
     return px.imshow(farray)
 
 
-external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
+external_stylesheets = [
+    dash_bootstrap_components.themes.BOOTSTRAP,
+    "https://codepen.io/chriddyp/pen/bWLwgP.css",
+]
 
 app = Dash(
     __name__,
@@ -180,6 +191,23 @@ c_regularization_description = [
 
 app.layout = html.Div(
     [
+        # Use the modal component as a pop-up warning whenever a user adds
+        # non-numerical data to the model
+        Modal(
+            [
+                ModalHeader(
+                    ModalTitle("Error: non-numerical columns found in input data")
+                ),
+                ModalBody(
+                    "The following columns contain non-numerical data and have been "
+                    "omitted from the model: "
+                ),
+                ModalFooter(),
+            ],
+            id="non-numeric-alert",
+            is_open=False,
+            centered=True,
+        ),
         html.Div(
             [
                 dcc.Graph(
@@ -235,6 +263,19 @@ app.layout = html.Div(
                                 "text-align": "center",
                             },
                         ),
+                        html.Div(
+                            [
+                                dcc.Checklist(
+                                    id="metadata-column-selector",
+                                    inline=True,
+                                    labelStyle={
+                                        "margin-right": "8pt",
+                                    },
+                                    inputStyle={"margin-right": "2pt"},
+                                ),
+                            ],
+                            id="metadata-column-selector-container",
+                        ),
                     ],
                     id="label-prediction-container",
                     style={"inline": "true"},
@@ -265,18 +306,52 @@ app.layout = html.Div(
                 ),
                 dcc.Store(id="raw-pca-data"),
                 dcc.Store(id="fitted-data"),
-                dcc.Store(id="x-values"),
                 dcc.Store(id="y-labeled"),
                 dcc.Store(id="y-predicted"),
                 dcc.Store(id="selected-data-point"),
                 dcc.Store(id="queried-data-point"),
                 dcc.Store(id="svc-model"),
                 dcc.Store(id="metadata-column-names"),
+                dcc.Store(id="embedding-column-names"),
+                dcc.Store(id="non-numeric-column-names"),
                 dcc.Download(id="download-model"),
             ],
         ),
     ],
 )
+
+
+@callback(
+    Output("non-numeric-alert", "children"),
+    Output("non-numeric-alert", "is_open"),
+    Input("non-numeric-column-names", "data"),
+    prevent_initial_call=True,
+)
+def render_modal_warning(non_numeric_cols_str: str) -> tuple:
+    """Create a pop-up to warn users against non-numerical variables in the model.
+
+    Args:
+        non_numeric_cols_str: JSON string of selected non-numerical columns
+
+    Returns:
+        a modal screen component, and whether to open the modal screen
+    """
+    non_numeric_cols = json.loads(non_numeric_cols_str)
+    modal_contents = [
+        ModalHeader(ModalTitle("Error: non-numerical columns found in input data")),
+        ModalBody(
+            [
+                "The following columns contain non-numerical data and have been omitted"
+                " from the model:",
+                html.Ul(children=[html.Li(column) for column in non_numeric_cols]),
+            ]
+        ),
+        ModalFooter(""),
+    ]
+    if len(non_numeric_cols) > 0:
+        return modal_contents, True
+    else:
+        return no_update, no_update
 
 
 @callback(
@@ -565,9 +640,9 @@ def update_raw_pca_data(_: Any) -> tuple:
 
 
 @callback(
-    Output("x-values", "data"),
     Output("y-labeled", "data", allow_duplicate=True),
     Output("y-predicted", "data", allow_duplicate=True),
+    Output("embedding-column-names", "data"),
     Input("fitted-data", "data"),
     prevent_initial_call="initial_duplicate",
 )
@@ -581,7 +656,7 @@ def set_initial_xy_values(dataf: str) -> tuple:
         dataf: json string for original dataframe
 
     Returns:
-        dataframe with filename and embeddings, label indicator, predicted class
+        label indicator, predicted class, and list of embeddings columns
     """
     df = pd.DataFrame(pd.read_json(StringIO(dataf)))
 
@@ -591,15 +666,6 @@ def set_initial_xy_values(dataf: str) -> tuple:
             f"No embedding columns found with prefix {emb_dim_prefix}",
         )
 
-    # x_values is just filename and embeddings
-    x_values = df.loc[
-        :,
-        [
-            filecolumn,
-        ]
-        + embeddings_columns,
-    ]
-
     # Use -1 to set every data point to unlabeled
     y_labeled = df.loc[:, [filecolumn]].copy()
     y_labeled["label"] = -1
@@ -608,7 +674,7 @@ def set_initial_xy_values(dataf: str) -> tuple:
     y_prediction = df.loc[:, [filecolumn]].copy()
     y_prediction[classcolumn] = "Regular"
 
-    return x_values.to_json(), y_labeled.to_json(), y_prediction.to_json()
+    return y_labeled.to_json(), y_prediction.to_json(), json.dumps(embeddings_columns)
 
 
 @callback(
@@ -674,14 +740,17 @@ def print_labels(labels):
     Output("queried-data-point", "data", allow_duplicate=True),
     Output("svc-model", "data"),
     Output("y-predicted", "data", allow_duplicate=True),
+    Output("non-numeric-column-names", "data"),
     Input("query-model", "n_clicks"),
-    Input("x-values", "data"),
+    Input("fitted-data", "data"),
     Input("y-labeled", "data"),
     Input("raw-pca-data", "data"),
     Input("svc-model", "data"),
     Input("svm-C-param", "value"),
     Input("svm-gamma-param", "value"),
     Input("metadata-column-names", "data"),
+    Input("metadata-column-selector", "value"),
+    Input("embedding-column-names", "data"),
     prevent_initial_call="initial_duplicate",
 )
 def query_model(
@@ -693,6 +762,8 @@ def query_model(
     svm_C: float,
     svm_gamma: float,
     metadata_columns: str,
+    selected_metadata_columns: list,
+    embeddings_columns_str: str,
 ) -> tuple:
     """Query the model for the least confident data point.
 
@@ -705,13 +776,18 @@ def query_model(
         svm_C: SVC C hyperparameter
         svm_gamma: SVC gamma hyperparameter
         metadata_columns: json string containing list of metadata columns
+        selected_metadata_columns: list of metadata columns for model input
+        embeddings_columns_str: json string containing list of embedding column names
 
     Returns:
-        clickdata for queried data point, retrained SVC model, y_pred from new model
+        clickdata for queried data point,
+        retrained SVC model,
+        y_pred from new model,
+        JSON list of selected non-numerical columns
     """
     # Only run when the query-model button has been clicked
     if callback_context.triggered_id != "query-model":
-        return no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update
 
     if model is not None:
         clf: SklearnClassifier = pickle.loads(bytes.fromhex(model))
@@ -725,10 +801,31 @@ def query_model(
 
     clf.estimator.set_params(C=svm_C, gamma=svm_gamma)
 
-    x_values = pd.read_json(StringIO(x_values_str))
-    files = x_values[[filecolumn]].copy()
+    embeddings_columns: list[str] = json.loads(embeddings_columns_str)
+    full_data = pd.read_json(StringIO(x_values_str))
+    files = full_data[[filecolumn]].copy()
 
-    x_values = x_values.drop(columns=filecolumn)
+    x_columns = embeddings_columns
+    numeric_selected_columns, non_numeric_selected_columns = [], []
+    if selected_metadata_columns is not None:
+        # Only use numerical columns, make warning pop up for non-numerical columns
+        # Treatment of non-numerical data depends on the data, so leave this to users
+        numeric_columns = full_data.select_dtypes(include="number").columns
+        for col in selected_metadata_columns:
+            if col not in numeric_columns:
+                non_numeric_selected_columns.append(col)
+            else:
+                numeric_selected_columns.append(col)
+
+        if len(non_numeric_selected_columns) > 0:
+            logger.warning(
+                f"Ignoring non-numerical columns: "
+                f"{', '.join(non_numeric_selected_columns)}"
+            )
+        x_columns += numeric_selected_columns
+
+    logger.debug(f"Using columns {x_columns}")
+    x_values = full_data[x_columns]
     y_values = pd.read_json(StringIO(y_labels_str))["label"].values
     clf.fit(x_values, y_values)
 
@@ -774,7 +871,7 @@ def query_model(
         lambda x: ["Regular", "Outlier"][x],
     )
     out_clf = pickle.dumps(clf).hex()
-    return clickdata, out_clf, files.to_json()
+    return clickdata, out_clf, files.to_json(), json.dumps(non_numeric_selected_columns)
 
 
 @callback(Input("selected-data-point", "data"))
@@ -814,7 +911,7 @@ def update_selection(clickData: dict, queryData: dict) -> dict:
     Output("download-data", "data"),
     Input("btn-download-excel", "n_clicks"),
     Input("btn-download-csv", "n_clicks"),
-    Input("x-values", "data"),
+    Input("fitted-data", "data"),
     Input("y-labeled", "data"),
     Input("y-predicted", "data"),
     prevent_initial_call=True,
@@ -840,7 +937,7 @@ def download_excel(
     """
     if callback_context.triggered_id not in ["btn-download-excel", "btn-download-csv"]:
         return no_update
-    x_values = pd.read_json(StringIO(x_values_str))
+    x_values = pd.read_json(StringIO(x_values_str)).drop(columns=classcolumn)
     y_labeled = pd.read_json(StringIO(y_labeled_str))
     y_predicted = pd.read_json(StringIO(y_predicted_str))
     out_df = pd.merge(x_values, y_labeled, on=filecolumn)
@@ -877,3 +974,23 @@ def download_model(_n_clicks_button: int, svc_model: str):
     svm = active_learning_classifier.estimator
 
     return dcc.send_bytes(pickle.dumps(svm), filename=f"model_{dt_stamp}.pkl")
+
+
+@callback(
+    Output("metadata-column-selector", "options"),
+    Input("metadata-column-names", "data"),
+    prevent_initial_call=True,
+)
+def set_metadata_column_options(column_names_str: str):
+    """Populate the metadata column list with column names
+
+    Args:
+        column_names_str: column names list formatted as JSON string
+
+    Returns:
+        a mapping of {column_name : column_name}
+    """
+    column_names = json.loads(column_names_str)
+    column_names_dict = {name: name for name in column_names}
+    logger.debug(f"Column names dictionary: {column_names_dict}")
+    return column_names_dict
