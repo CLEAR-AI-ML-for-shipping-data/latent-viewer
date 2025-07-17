@@ -6,13 +6,21 @@ from io import StringIO
 from time import time
 from typing import Any, Dict, Union
 
+import dash_bootstrap_components
 import h5py
 import numpy as np
 import pandas as pd
 import plotly
 import plotly.express as px
 from dash import Dash, Input, Output, callback, callback_context, dcc, html, no_update
-from dash_bootstrap_components import Popover
+from dash_bootstrap_components import (
+    Modal,
+    ModalBody,
+    ModalFooter,
+    ModalHeader,
+    ModalTitle,
+    Popover,
+)
 from loguru import logger
 from plotly.subplots import make_subplots
 from skactiveml.classifier import SklearnClassifier
@@ -110,7 +118,10 @@ def show_hdf5_image(filename: str) -> plotly.graph_objs.Figure:
     return px.imshow(farray)
 
 
-external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
+external_stylesheets = [
+    dash_bootstrap_components.themes.BOOTSTRAP,
+    "https://codepen.io/chriddyp/pen/bWLwgP.css",
+]
 
 app = Dash(
     __name__,
@@ -180,6 +191,23 @@ c_regularization_description = [
 
 app.layout = html.Div(
     [
+        # Use the modal component as a pop-up warning whenever a user adds
+        # non-numerical data to the model
+        Modal(
+            [
+                ModalHeader(
+                    ModalTitle("Error: non-numerical columns found in input data")
+                ),
+                ModalBody(
+                    "The following columns contain non-numerical data and have been "
+                    "omitted from the model: "
+                ),
+                ModalFooter(),
+            ],
+            id="non-numeric-alert",
+            is_open=False,
+            centered=True,
+        ),
         html.Div(
             [
                 dcc.Graph(
@@ -281,11 +309,45 @@ app.layout = html.Div(
                 dcc.Store(id="svc-model"),
                 dcc.Store(id="metadata-column-names"),
                 dcc.Store(id="embedding-column-names"),
+                dcc.Store(id="non-numeric-column-names"),
                 dcc.Download(id="download-model"),
             ],
         ),
     ],
 )
+
+
+@callback(
+    Output("non-numeric-alert", "children"),
+    Output("non-numeric-alert", "is_open"),
+    Input("non-numeric-column-names", "data"),
+    prevent_initial_call=True,
+)
+def render_modal_warning(non_numeric_cols_str: str) -> tuple:
+    """Create a pop-up to warn users against non-numerical variables in the model.
+
+    Args:
+        non_numeric_cols_str: JSON string of selected non-numerical columns
+
+    Returns:
+        a modal screen component, and whether to open the modal screen
+    """
+    non_numeric_cols = json.loads(non_numeric_cols_str)
+    modal_contents = [
+        ModalHeader(ModalTitle("Error: non-numerical columns found in input data")),
+        ModalBody(
+            [
+                "The following columns contain non-numerical data and have been omitted"
+                " from the model:",
+                html.Ul(children=[html.Li(column) for column in non_numeric_cols]),
+            ]
+        ),
+        ModalFooter(""),
+    ]
+    if len(non_numeric_cols) > 0:
+        return modal_contents, True
+    else:
+        return no_update, no_update
 
 
 @callback(
@@ -674,6 +736,7 @@ def print_labels(labels):
     Output("queried-data-point", "data", allow_duplicate=True),
     Output("svc-model", "data"),
     Output("y-predicted", "data", allow_duplicate=True),
+    Output("non-numeric-column-names", "data"),
     Input("query-model", "n_clicks"),
     Input("fitted-data", "data"),
     Input("y-labeled", "data"),
@@ -713,11 +776,14 @@ def query_model(
         embeddings_columns_str: json string containing list of embedding column names
 
     Returns:
-        clickdata for queried data point, retrained SVC model, y_pred from new model
+        clickdata for queried data point,
+        retrained SVC model,
+        y_pred from new model,
+        JSON list of selected non-numerical columns
     """
     # Only run when the query-model button has been clicked
     if callback_context.triggered_id != "query-model":
-        return no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update
 
     if model is not None:
         clf: SklearnClassifier = pickle.loads(bytes.fromhex(model))
@@ -736,8 +802,23 @@ def query_model(
     files = full_data[[filecolumn]].copy()
 
     x_columns = embeddings_columns
+    numeric_selected_columns, non_numeric_selected_columns = [], []
     if selected_metadata_columns is not None:
-        x_columns += selected_metadata_columns
+        # Only use numerical columns, make warning pop up for non-numerical columns
+        # Treatment of non-numerical data depends on the data, so leave this to users
+        numeric_columns = full_data.select_dtypes(include="number").columns
+        for col in selected_metadata_columns:
+            if col not in numeric_columns:
+                non_numeric_selected_columns.append(col)
+            else:
+                numeric_selected_columns.append(col)
+
+        if len(non_numeric_selected_columns) > 0:
+            logger.warning(
+                f"Ignoring non-numerical columns: "
+                f"{', '.join(non_numeric_selected_columns)}"
+            )
+        x_columns += numeric_selected_columns
 
     logger.debug(f"Using columns {x_columns}")
     x_values = full_data[x_columns]
@@ -786,7 +867,7 @@ def query_model(
         lambda x: ["Regular", "Outlier"][x],
     )
     out_clf = pickle.dumps(clf).hex()
-    return clickdata, out_clf, files.to_json()
+    return clickdata, out_clf, files.to_json(), json.dumps(non_numeric_selected_columns)
 
 
 @callback(Input("selected-data-point", "data"))
